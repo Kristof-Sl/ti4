@@ -34,6 +34,7 @@ class App extends React.Component {
             customMapBuilding: false,
             tiles: [],
             unusedTiles: [],
+			sliceData: {},
             overlayVisible: false,
             zoom: 1.0,
             lastCall: 0,
@@ -175,12 +176,14 @@ class App extends React.Component {
             })
         } else if (newTiles.length > 0) {
             this.setState({
-                tiles: newTiles
+                tiles: newTiles,
+				sliceData: {}
             }, this.drawMap)
         } else {
             // No tiles or settings to worry about, just bring us back to the main page
             this.setState({
-                tiles: []
+                tiles: [],
+				sliceData: {}
             }, this.drawMap)
         }
     };
@@ -193,10 +196,10 @@ class App extends React.Component {
      * @param newEncodedOptions the settings, encoded as a string
      * @param isNewGeneration A setting to be set when a new generation occurs, to trigger adding it to the history
      */
-    updateTiles(newTiles, newEncodedOptions, isNewGeneration) {
+    updateTiles(newTiles, newEncodedOptions, isNewGeneration, newSliceData) {
         // Remove the unused tile numbers at the end of the array
         newTiles = this.removeTrailing(newTiles);
-
+		
         // Add it to the url as a parameter
         let params = '&tiles=' + newTiles.toString()
         let encodedOptions = this.state.encodedOptions;
@@ -242,6 +245,7 @@ class App extends React.Component {
 
         this.setState({
             tiles: newTiles,
+			sliceData: newSliceData,
             unusedTiles: unusedTiles,
             tileClicked: tileClicked,
             encodedOptions: encodedOptions,
@@ -929,13 +933,13 @@ class App extends React.Component {
                 />
                 
                 <MoreInfo visible={this.state.moreInfoVisible} currentPlayerNames={this.state.currentPlayerNames}
-                          useProphecyOfKings={this.state.useProphecyOfKings} tiles={this.state.tiles}
-                          getTileNumber={this.getTileNumber}
+							useProphecyOfKings={this.state.useProphecyOfKings} tiles={this.state.tiles} sliceData={this.state.sliceData}
+							getTileNumber={this.getTileNumber}
                 />
                 
                 <MapOptions visible={this.state.isOptionsMenuShowing} useProphecyOfKings={this.state.useProphecyOfKings}
                             currentPlayerNames={this.state.currentPlayerNames} currentRaces={this.state.currentRaces}
-                            tiles={this.state.tiles} includedTiles={this.state.includedTiles}
+                            tiles={this.state.tiles} sliceData={this.state.sliceData} includedTiles={this.state.includedTiles}
                             excludedTiles={this.state.excludedTiles} lockedTiles={this.state.lockedTiles}
 
                             ref={this.mapOptions}

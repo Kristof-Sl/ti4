@@ -31,8 +31,8 @@ class MapOptions extends React.Component {
                 7: Object.keys(boardData.styles["7"]).map((key) => key),
                 8: Object.keys(boardData.styles["8"]).map((key) => key),
             },
-            pickStyles: ["balanced", "random", "resource", "influence", "custom"],
-            placementStyles: ["slice", "initial", "home", "random"],
+            pickStyles: ["balanced", "random", "resource", "influence", "custom", "KSL"],
+            placementStyles: ["slice", "initial", "home", "random", "Fairness","OptimalBalance"],
             races: [...raceData["races"]],
             pokRaces: [...raceData["pokRaces"]],
             homeworlds: raceData["homeSystems"],
@@ -49,6 +49,8 @@ class MapOptions extends React.Component {
             currentPickStyle: startingValues["pickStyles"][0],
             currentPlacementStyle: startingValues["placementStyles"][0],
             currentSeed: "",
+			generationIterations: 0,
+			stopCriterion: 0.1,
             userSetSeed: false,
             pickRaces: false,
             pickMultipleRaces: false,
@@ -67,6 +69,8 @@ class MapOptions extends React.Component {
             shufflePriorityHelp: false,
             reversePlacementOrderHelp: false,
             ensureRacialAnomaliesHelp: false,
+			setIterationsHelp: false,
+			setStopCritHelp: false,
 
             resourceWeight: 70,
             influenceWeight: 30,
@@ -85,6 +89,8 @@ class MapOptions extends React.Component {
         this.updatePlayerCount = this.updatePlayerCount.bind(this);
         this.updateBoardStyle = this.updateBoardStyle.bind(this);
         this.updateSeed = this.updateSeed.bind(this);
+		this.resetGenerationIterations = this.resetGenerationIterations.bind(this);
+		this.resetStopCriterion = this.resetStopCriterion.bind(this);
 
         this.ensureAnomalies = this.ensureAnomalies.bind(this);
         this.ensureWormholesForType = this.ensureWormholesForType.bind(this);
@@ -107,6 +113,8 @@ class MapOptions extends React.Component {
         this.toggleShufflePriorityHelp = this.toggleShufflePriorityHelp.bind(this);
         this.toggleReversePlacementOrderHelp = this.toggleReversePlacementOrderHelp.bind(this);
         this.toggleEnsureRacialAnomaliesHelp = this.toggleEnsureRacialAnomaliesHelp.bind(this);
+        this.toggleGenIterHelp = this.toggleGenIterHelp.bind(this);
+		this.toggleStopCritHelp = this.toggleStopCritHelp.bind(this);
     }
 
     handleInputChange(event) {
@@ -218,6 +226,21 @@ class MapOptions extends React.Component {
                 userSetSeed: event.target.value !== ""  // Ignore user entry if the value is blank
             });
         }
+    }
+	
+	resetGenerationIterations(event) { 
+		this.setState({
+			generationIterations: 0,
+		});
+        
+    }
+	resetStopCriterion(event) { 
+		if (event.target.value != "") {
+			this.setState({
+				stopCriterion: event.target.value,
+			});
+		}
+        
     }
 
     capitalize(str) {
@@ -415,7 +438,9 @@ class MapOptions extends React.Component {
                 // Tiles were changed after rendering, so we need to display them
                 this.props.updateTiles(newTiles, newSettings);
             } else {
-                this.props.updateTiles(this.getNewTileSet(useProphecyOfKings, currentRaces), newSettings, false);
+				let newTileSetGenerated = this.getNewTileSet(useProphecyOfKings, currentRaces);
+				let newSliceDataGenerated = this.getSliceData(newTileSetGenerated);
+                this.props.updateTiles(newTileSetGenerated, newSettings, false, newSliceDataGenerated);
             }
         })
 
@@ -427,25 +452,42 @@ class MapOptions extends React.Component {
      * @param event The event which triggered this action, to be ignored.
      */
     generateBoard(event) {
-        // Don't actually submit the form
-        if (event !== undefined) {
-            event.preventDefault();
-        }
+		// Don't actually submit the form
+		if (event !== undefined) {
+			event.preventDefault();
+		}
 
-        // Create a random seed to use unless the user has specified one
-        let currentSeed = this.state.currentSeed
-        if (!this.state.userSetSeed) {
-            currentSeed = Math.floor(Math.random() * Math.floor(9999));
-        }
-
-        this.setState({
-            currentSeed: currentSeed,
-            generated: true,
-        }, () => {
-            this.props.updateTiles(this.getNewTileSet(), this.encodeSettings(), true);
-        });
+		// Create a random seed to use unless the user has specified one
+		let currentSeed = this.state.currentSeed;
+		if (!this.state.userSetSeed) {
+			currentSeed = Math.floor(Math.random() * Math.floor(9999));
+		}
+		let genIter = this.state.generationIterations + 1;
+		
+		this.setState({
+			currentSeed: currentSeed,
+			generated: true,
+			generationIterations: genIter,
+		}, () => {
+				
+			let newTileSetGenerated = this.getNewTileSet();
+			let newSliceDataGenerated = this.getSliceData(newTileSetGenerated);
+			let sliceTotalWeights = [];
+			for (let k=0; k < newSliceDataGenerated.length; k++){
+				sliceTotalWeights[k] = newSliceDataGenerated[k].PlayerWeight;
+			}
+			let maxDeltaWeight = (Math.max(...sliceTotalWeights) - Math.min(...sliceTotalWeights))/Math.max(...sliceTotalWeights);
+			this.props.updateTiles(newTileSetGenerated, this.encodeSettings(), true, newSliceDataGenerated);
+			//debugger;
+			if (!this.state.userSetSeed && maxDeltaWeight>this.state.stopCriterion && this.state.generationIterations < 50) {
+				this.generateBoard(event);
+				//console.log("iteration number: " + this.state.generationIterations);
+			}
+		
+		}); 
 
     }
+
 
     /**
      * Create a set of new tiles for the board based on the user's input.
@@ -482,11 +524,94 @@ class MapOptions extends React.Component {
         // Place home planets
         this.placeHomeSystems(newTiles, currentRaces)
 
+		if (this.state.currentPlacementStyle == "OptimalBalance") {
+			
+			let playerSliceComplete = [false, false, false, false, false, false, false, false];
+			let EQSliceComplete = false;
+			
+			//@KSL new placing algorithm
+			//Run over all systems to place from heaviest weight to lightest weight
+			for (let newSystem of newSystems) {
+				
+				//Place this system in the slice with the lowest playerWeight
+				let theSliceData = this.getSliceData(newTiles);
+				let weights = theSliceData[0].UsedWeights;
+				let EQSlice = [];
+				
+				let allPlayersComplete = true;
+				
+				for (let j = 0; j < theSliceData.length; j++) {
+					playerSliceComplete[j] = true;
+					for (let theSystem of theSliceData[j].Slice){
+						if (newTiles[theSystem] < 0) {
+							playerSliceComplete[j] = false;
+							allPlayersComplete = false;
+						}
+					}	
+				}
+				
+				
+				//find the right player
+				let lowestPlayer = 999;
+				let lowestPlayerWeight = 999;
+				for (let j = 0; j < theSliceData.length; j++) {
+					
+					EQSlice = EQSlice.concat(theSliceData[j].Equidistant);
+					if (theSliceData[j].PlayerWeight < lowestPlayerWeight && !playerSliceComplete[j]) {
+						lowestPlayerWeight = theSliceData[j].PlayerWeight;
+						lowestPlayer = j;
+					}
+				}
+				
+				//clean up EQSlice
+				let EQSliceClean = [];
+				for (let k = 0; k<EQSlice.length; k++){
+						if (EQSliceClean.indexOf(EQSlice[k]) < 0 && EQSlice[k] > 0) {
+							EQSliceClean.push(EQSlice[k]);
+						}
+				}
+				//check EQ if this is lowest in weight
+				let EQWeight = 0;
+				EQSliceComplete = true;
+				
+				for (let tileNumber of EQSliceClean) {
+					let thisSystem = newTiles[tileNumber];
+					if (thisSystem > 0){
+						let thisWeight = this.getWeight(thisSystem, weights, []);
+						EQWeight += thisWeight;
+					} else if (thisSystem < 0){
+						EQSliceComplete = false;
+					}
+				}
+				
+				if (!allPlayersComplete || !EQSliceComplete) {
+					let thisPlayerSlice = [];
+					if (EQWeight < lowestPlayerWeight && !EQSliceComplete) {
+						thisPlayerSlice = EQSliceClean;
+					} else {
+						thisPlayerSlice = theSliceData[lowestPlayer].Slice;
+					}
+					//Choose a random position in the slice of the found player
+					
+					let shuffledSlice = this.shuffle(thisPlayerSlice);
+					let chosenIndex = 0;
+					let chosenTile = shuffledSlice[chosenIndex];
+					while (newTiles[chosenTile] > -1 && chosenIndex < shuffledSlice.length) {
+						chosenIndex++;
+						chosenTile = shuffledSlice[chosenIndex];
+					}
+					newTiles[chosenTile] = newSystem;
+				}					
+			}
+		} else {
         // Place planets one at a time, using the indexes to place combined with the ordered planet list
-        for (let systemIndex of systemIndexes) {
-            newTiles[systemIndex] = newSystems.shift();
-        }
+			for (let systemIndex of systemIndexes) {
+				newTiles[systemIndex] = newSystems.shift();
+			}
+		}
 
+		
+		
         // Place any systems that were locked from the previous generation
         this.placeLockedSystems(newTiles)
 
@@ -563,6 +688,16 @@ class MapOptions extends React.Component {
                     systemIndexes = systemIndexes.concat(newPrimary);
                 } else {
                     systemIndexes = newPrimary.concat(systemIndexes);
+                }
+                break;
+			case("Fairness"):
+				//@KSL shuffle secondary tiles to randomize equidistant planets
+				this.shuffle(secondary);
+                // Combine them in their listed order
+                if (this.state.reversePlacementOrder) {
+                    systemIndexes = tertiary.concat(secondary).concat(primary);
+                } else {
+                    systemIndexes = primary.concat(secondary).concat(tertiary);
                 }
                 break;
             case("slice"):
@@ -775,6 +910,17 @@ class MapOptions extends React.Component {
                     "influence": 100,
                     "planet_count": 10,
                     "specialty": 10,
+                    "anomaly": 10,
+                    "wormhole": 10,
+                    "racial": 5
+                }
+                break;
+			case "KSL":
+                weights = {
+                    "resource": 80,
+                    "influence": 40,
+                    "planet_count": 10,
+                    "specialty": 50,
                     "anomaly": 10,
                     "wormhole": 10,
                     "racial": 5
@@ -1218,7 +1364,7 @@ class MapOptions extends React.Component {
         while (currentIndex < planetWeights.length) {
             let planetWeight = planetWeights[currentIndex];
             // Something in this array, lets see if we add to it
-            if (planetWeight[1] >= (currentHighValue - this.state.shuffleThreshold)) {
+            if (planetWeight[1] >= (currentHighValue + 10)) { //- this.state.shuffleThreshold)) { [@KSL switch off post process shuffling]
                 // Add this item to the array to shuffle
                 currentSetToShuffle.push(planetWeight);
             } else {
@@ -1234,7 +1380,7 @@ class MapOptions extends React.Component {
         currentSetToShuffle = this.shuffle(currentSetToShuffle)
         postPossiblePlanets = postPossiblePlanets.concat(currentSetToShuffle)
 
-
+//debugger;
         // Convert from tuple down to just the tile number
         let orderedPlanets = [];
         for (let weightedPlanet in postPossiblePlanets) {
@@ -1258,8 +1404,8 @@ class MapOptions extends React.Component {
         }
 
         // Handle anomalies
-        if (tile['type'] === 'red') {
-            total_weight += weights['anomaly'] + 40;
+        if (tile['anomaly'] != null) { //tile['type'] === 'red') { @KSL changed
+            total_weight += weights['anomaly'] ; //+ 40; @KSL changed
             // Providing bonuses to these sections mean the other ones are never used
             // if (tile['anomaly'] === null
             //     || tile['anomaly'] === 'asteroid-field'
@@ -1323,7 +1469,455 @@ class MapOptions extends React.Component {
             ensureRacialAnomaliesHelp: !this.state.ensureRacialAnomaliesHelp
         })
     }
+	toggleGenIterHelp(event) {
+        this.setState({
+            setIterationsHelp: !this.state.setIterationsHelp
+        })
+    }
+	toggleStopCritHelp(event) {
+        this.setState({
+            setStopCritHelp: !this.state.setStopCritHelp
+        })
+    }
 
+	//KSL START
+	getSliceData(newTiles) {
+		//let homeTiles = boardData.styles["6"]["KSL2"]["home_worlds"];
+		let homeTiles = boardData.styles[this.state.currentNumberOfPlayers.toString()][this.state.currentBoardStyle]['home_worlds']
+
+		//The function "getNewTilesToPlace()" from "mapoptions.js" needs to be invoked first in order to instantiate the "systemIndexes" array listing all tile indexes on the board
+		//let systemIndexes = [7, 9, 11, 13, 15, 17, 33, 30, 27, 24, 21, 36, 8, 10, 12 , 14, 16, 18, 6, 5, 4, 3, 2, 1, 20, 23, 26, 29, 32, 35];
+		
+		let primary = [...boardData.styles[this.state.currentNumberOfPlayers.toString()][this.state.currentBoardStyle]["primary_tiles"]];
+        let secondary = [...boardData.styles[this.state.currentNumberOfPlayers.toString()][this.state.currentBoardStyle]["secondary_tiles"]];
+        let tertiary = [...boardData.styles[this.state.currentNumberOfPlayers.toString()][this.state.currentBoardStyle]["tertiary_tiles"]];
+		let numTiles = primary.length + secondary.length + tertiary.length + homeTiles.length + 1;
+
+		//the "newTiles" array listing all systems on the board needs to be instantiated
+		//let newTiles = this.props.tiles;
+		
+		if (newTiles != null && newTiles != undefined && newTiles.length > 0) {
+		
+			let systemIndexes = [];
+			for (let i = 0; i < newTiles.length; i++) {
+				if (i < numTiles) { //newTiles[i] > -1) {
+					systemIndexes.push(i);
+				}
+			}
+		
+			let weights = {};
+			switch (this.state.currentPickStyle) {
+				case "random":
+					//this.shuffle(newSystems)
+					//return newSystems
+				case "custom":
+					weights = {
+						"resource": parseInt(this.state.resourceWeight),
+						"influence": parseInt(this.state.influenceWeight),
+						"planet_count": parseInt(this.state.planetCountWeight),
+						"specialty": parseInt(this.state.specialtyWeight),
+						"anomaly": parseInt(this.state.anomalyWeight),
+						"wormhole": parseInt(this.state.wormholeWeight),
+						"racial": parseInt(this.state.wormholeWeight) - 5
+					}
+					break;
+				case "resource":
+					weights = {
+						"resource": 100,
+						"influence": 10,
+						"planet_count": 10,
+						"specialty": 10,
+						"anomaly": 10,
+						"wormhole": 10,
+						"racial": 5
+					}
+					break;
+				case "influence":
+					weights = {
+						"resource": 10,
+						"influence": 100,
+						"planet_count": 10,
+						"specialty": 10,
+						"anomaly": 10,
+						"wormhole": 10,
+						"racial": 5
+					}
+					break;
+				case "KSL":
+					weights = {
+						"resource": 80,
+						"influence": 40,
+						"planet_count": 10,
+						"specialty": 50,
+						"anomaly": 10,
+						"wormhole": 10,
+						"racial": 5
+					}
+					break;
+				case "balanced":
+				default:
+					if (this.props.useProphecyOfKings) {
+						weights = {
+							"resource": 80,
+							"influence": 30,
+							"planet_count": 15,
+							"specialty": 50,
+							"anomaly": 40,
+							"wormhole": 25,
+							"racial": 20
+						}
+					} else {
+						weights = {
+							"resource": 80,
+							"influence": 30,
+							"planet_count": 15,
+							"specialty": 40,
+							"anomaly": 30,
+							"wormhole": 25,
+							"racial": 20
+						}
+					}
+					break;
+			}
+
+
+			//DETERMINE ADJACENCY DATA
+
+			let playerCounter = 1;
+			
+			//Array including one object per player. Each object contains the player identifier, the hometile, and the adjacency data
+			let allAdjData = [];
+			
+			//Array including one array per player, the adjacency data. This is a multidimensional array with the first element being the distance, and the second being the list of tile indexes at this distance
+			let allAdjDataArray = [];
+
+
+			for (let homeTile of homeTiles) {
+			  let playerAdjData = [];
+			  let tilesAlreadyListed = [];
+			  
+			  //List all tiles up to a distance of 6 away: increase the limit if larger boards need to be accomodated
+			  for (let distance = 0; distance < 7; distance++) {
+				
+				let thisTileArray = [];
+				if (distance === 0){
+				  thisTileArray = [homeTile];
+				  tilesAlreadyListed.push(homeTile);
+				} else {
+					for (let startTile of playerAdjData[distance-1]) {
+					//loop over all tiles in previous distance and list all adjacent tiles that are not listed yet
+					  let adjArray = adjacencyData[startTile];
+					  
+					  for (let adjacentTile of adjArray) {
+						if (tilesAlreadyListed.indexOf(adjacentTile) < 0){
+						  //if this tile was not already identified closer to the hometile
+						  if (systemIndexes.indexOf(adjacentTile) >= 0 || homeTiles.indexOf(adjacentTile) >= 0 || adjacentTile == "0") {
+							//and if this tile is on the board
+							//Then add tile to the array of adjacent tiles and add it to the alreadylisted tiles
+							tilesAlreadyListed.push(adjacentTile);
+							thisTileArray.push(adjacentTile); 
+						  }
+						  
+						} else {
+						  //if this tile was already identified closer to the hometile
+						  //Then jump over it and do nothing          
+						}            
+					  }
+					}     
+				}
+				
+				//TODO test what happens if thisTileArray is empty => should push an empty array, but still take up a "position"
+				playerAdjData.push(thisTileArray);
+				
+			  }
+			  //console.log("Distance: " + distance + " PlayerAdjData level 0: " + playerAdjData[0] + " PlayerAdjData level 1: " + playerAdjData[1]);
+			  let newAdjData = {Player:"P"+playerCounter, HomeTile:homeTile, Distances:playerAdjData};
+			  
+			  allAdjData.push(newAdjData);
+			  allAdjDataArray.push(playerAdjData);
+			  playerCounter++;
+			}
+
+			//SLICE determination
+			// go over all tiles on the board, ie in "SystemIndexes"
+			// check to which HS it is the closest, and add to the slice of this player
+			// also list the tiles that are equidistant between this player and another player
+
+			let allSliceData = [];
+			let allSliceDataArray = [];
+			let allSliceEquidistArray = [];
+
+			for (let thisplayer = 0; thisplayer < allAdjDataArray.length; thisplayer++) {
+			  allSliceDataArray.push([]);
+			  allSliceEquidistArray.push([]);
+			}
+
+			for (let systemIndex of systemIndexes) {
+			  
+				let distanceToPlayerX = [];
+				//loop over all players
+				for (let thisplayer = 0; thisplayer < allAdjDataArray.length; thisplayer++) {
+					let tileFound = false;
+					let thisDistance = 0;
+					do {
+						if (allAdjDataArray[thisplayer][thisDistance].indexOf(systemIndex) >= 0) {
+							distanceToPlayerX.push(thisDistance);
+							tileFound = true;
+						}
+					  
+						thisDistance++;
+						if (thisDistance >= allAdjDataArray[thisplayer].length) {
+							tileFound = true;
+						}
+					}
+					while (!tileFound);
+				}
+			  
+				let shortestDistance = 999;
+				let thePlayer = 999;
+				let equidistPlayers = [];
+				let equiDistTile = false;
+			  
+				for (let thisplayer = 0; thisplayer < allAdjDataArray.length; thisplayer++) {
+					if (distanceToPlayerX[thisplayer] < shortestDistance) {
+						shortestDistance = distanceToPlayerX[thisplayer];
+						thePlayer = thisplayer;
+						equiDistTile = false;
+					}
+					else if (distanceToPlayerX[thisplayer] == shortestDistance) {
+						equiDistTile = true;
+						thePlayer = 999;
+					}
+					  
+				}
+				if (thePlayer < 999 && shortestDistance > 0) {  //second check to exclude home system from slice
+					allSliceDataArray[thePlayer].push(systemIndex);
+				}
+				for (let i=0; i<distanceToPlayerX.length; i++) {
+					if (distanceToPlayerX[i] == shortestDistance && equiDistTile) {
+						allSliceEquidistArray[i].push(systemIndex);
+					}
+				}
+			}
+
+			for (let j = 0; j < allAdjDataArray.length; j++) {
+				let thisPlayer = j+1;
+				let newAllSliceData = {Player:"P"+thisPlayer, HomeTile:allAdjData[j].HomeTile, Slice:allSliceDataArray[j], Equidistant:allSliceEquidistArray[j]};
+				allSliceData.push(newAllSliceData);
+			}
+
+			let fullSliceData = [];
+			
+			//loop over all players
+			for (let j = 0; j < allAdjDataArray.length; j++) {
+				let thisPlayer = j+1;
+				let resources = 0;
+				let influence = 0;
+				let numPlanets = 0;
+				let specialties = 0;
+				let wormholes = 0;
+				let anomalies = 0;
+			  
+				//Get slice characteristics
+				for (let tileNumber of allSliceDataArray[j]) {
+					let thisSystem = newTiles[tileNumber];
+					if (thisSystem > 0){
+						let tile = tileData.all[thisSystem.toString()];
+					
+						for (let planetIndex in tile['planets']) {
+							let planet = tile['planets'][planetIndex];
+							resources += planet['resources'];
+							influence += planet['influence'];
+							numPlanets++;
+							specialties += planet['specialty'] ? 1 : 0;	
+						}
+						wormholes += tile['wormhole'] ? 1 : 0;
+						if (tile['anomaly'] != null) {
+							//TODO: not all red are anomalies!
+							anomalies++;
+						}
+					}
+				}
+			  
+				let resourcesEQ = 0;
+				let influenceEQ = 0;
+				let numPlanetsEQ = 0;
+				let specialtiesEQ = 0;
+				let wormholesEQ = 0;
+				let anomaliesEQ = 0;
+			  
+				//Get Equidistant characteristics
+				for (let tileNumber of allSliceEquidistArray[j]) {
+					let thisSystem = newTiles[tileNumber];
+					if (thisSystem > 0){
+						let tile = tileData.all[thisSystem.toString()];
+					
+						for (let planetIndex in tile['planets']) {
+							let planet = tile['planets'][planetIndex];
+							resourcesEQ += planet['resources'];
+							influenceEQ += planet['influence'];
+							numPlanetsEQ++;
+							specialtiesEQ += planet['specialty'] ? 1 : 0;
+							
+							
+						}
+						wormholesEQ += tile['wormhole'] ? 1 : 0;
+						if (tile['anomaly'] != null) {
+							//TODO: not all red are anomalies!
+							anomaliesEQ++;
+						}
+					}
+				}
+			  
+				let resourcesHS = 0;
+				let influenceHS = 0;
+				let numPlanetsHS = 0;
+				let specialtiesHS = 0;
+				let wormholesHS = 0;
+				// debugger;
+				let thisHomeTile = allAdjData[j].HomeTile;
+				let thisSystem = newTiles[thisHomeTile];
+				if (thisSystem > 0){
+					let tile = tileData.all[thisSystem.toString()];
+					
+					for (let planetIndex in tile['planets']) {
+						let planet = tile['planets'][planetIndex];
+						resourcesHS += planet['resources'];
+						influenceHS += planet['influence'];
+						numPlanetsHS++;
+						specialtiesHS += planet['specialty'] ? 1 : 0;
+						
+							
+					} 
+					wormholesHS += tile['wormhole'] ? 1 : 0;
+				}
+			  //debugger;
+				let sliceWeight = 0;
+				sliceWeight += (resources / 4) * weights['resource'];
+				sliceWeight += (influence / 4) * weights['influence'];
+				sliceWeight += (numPlanets / 2) * weights['planet_count'];
+				sliceWeight += specialties * weights['specialty'];
+				sliceWeight += wormholes * weights['wormhole'];
+				sliceWeight += anomalies * (weights['anomaly']);
+			  
+				let EQWeight = 0;
+				EQWeight += (resourcesEQ / 4) * weights['resource'];
+				EQWeight += (influenceEQ / 4) * weights['influence'];
+				EQWeight += (numPlanetsEQ / 2) * weights['planet_count'];
+				EQWeight += specialtiesEQ * weights['specialty'];
+				EQWeight += wormholesEQ * weights['wormhole'];
+				EQWeight += anomaliesEQ * (weights['anomaly']);
+			  
+				let HSWeight = 0;
+				HSWeight += (resourcesHS / 4) * weights['resource'];
+				HSWeight += (influenceHS / 4) * weights['influence'];
+				HSWeight += (numPlanetsHS / 2);
+				HSWeight += specialtiesHS * weights['specialty'];
+				HSWeight += wormholesHS * weights['wormhole'];
+				//HSWeight += anomaliesHS * weights['anomaly'] + 40;
+			  
+				let totalWeight = sliceWeight + 0.5*EQWeight;
+				//debugger;
+				let playerWeight = 0;
+				//alternative weight calculation
+									
+				for (let tileNumber of allSliceDataArray[j]) {
+					let thisSystem = newTiles[tileNumber];
+					if (thisSystem > 0){
+						let thisWeight = this.getWeight(thisSystem, weights, []);
+						
+						let foundDistance = false;
+						let distance = 0;
+						
+						do {
+							let theArray = allAdjDataArray[j][distance];
+							if (theArray.indexOf(tileNumber) > -1) {
+								foundDistance = true;
+							} else {
+								distance++;
+							}
+						} while (!foundDistance && distance < allAdjDataArray[j].length)
+						
+						if (foundDistance) {
+							switch (distance) {
+								case 0:
+									playerWeight += thisWeight;
+									break;
+								case 1:
+									playerWeight += 0.75*thisWeight;
+									break;
+								case 2:
+									playerWeight += 0.5*thisWeight;
+									break;
+								case 3:
+									playerWeight += 0.25*thisWeight;
+							}
+						}
+					}
+				}
+				for (let tileNumber of allSliceEquidistArray[j]) {
+					let thisSystem = newTiles[tileNumber];
+					if (thisSystem > 0){
+						let thisWeight = this.getWeight(thisSystem, weights, []);
+						
+						let foundDistance = false;
+						let distance = 0;
+						
+						do {
+							let theArray = allAdjDataArray[j][distance];
+							if (theArray.indexOf(tileNumber) > -1) {
+								foundDistance = true;
+							} else {
+								distance++;
+							}
+						} while (!foundDistance && distance < allAdjDataArray[j].length)
+						
+						if (foundDistance) {
+							switch (distance) {
+								case 0:
+									playerWeight += 0.5*thisWeight;
+									break;
+								case 1:
+									playerWeight += 0.5*0.75*thisWeight;
+									break;
+								case 2:
+									playerWeight += 0.5*0.5*thisWeight;
+									break;
+								case 3:
+									playerWeight += 0.5*0.25*thisWeight;
+							}
+						}
+					}
+				}
+					
+				
+				
+				let sliceTiles = [];
+				for (let k = 0;k < allSliceDataArray[j].length; k++) {
+					let tIndex = allSliceDataArray[j][k];
+					sliceTiles[k] = newTiles[tIndex];
+				}
+			  
+			  
+				let newAllSliceData = {Player:"P"+thisPlayer, HomeTile:allAdjData[j].HomeTile, Slice:allSliceDataArray[j], Equidistant:allSliceEquidistArray[j], SliceTiles:sliceTiles, HomeResources:resourcesHS, HomeInfluence:influenceHS, HomePlanets:numPlanetsHS, HomeSpecialties:specialtiesHS, HomeWormholes:wormholesHS, SliceResources:resources, SliceInfluence:influence, SlicePlanets:numPlanets, SliceSpecialties:specialties, SliceWormholes:wormholes, SliceAnomalies:anomalies, EQResources:resourcesEQ, EQInfluence:influenceEQ, EQPlanets:numPlanetsEQ, EQSpecialties:specialtiesEQ, EQWormholes:wormholesEQ, EQAnomalies:anomaliesEQ, SliceWeight:sliceWeight, EQWeight:EQWeight, HSWeight:HSWeight, TotalWeight:totalWeight, PlayerWeight:playerWeight, UsedWeights:weights};
+				fullSliceData.push(newAllSliceData);
+			}
+		
+			return fullSliceData;
+		
+		} else {
+			return null;
+		}
+		
+/*
+		for (let j = 0; j < allAdjDataArray.length; j++){
+		  
+		  document.write("Player: " + fullSliceData[j].Player + " - Hometile: " + fullSliceData[j].HomeTile + " - Tiles in slice: " + fullSliceData[j].Slice + " - Equidistant tiles: " + fullSliceData[j].Equidistant + "<br>--- RES in HS: " + fullSliceData[j].HomeResources + " - INF in HS: " + fullSliceData[j].HomeInfluence + " - Planets in HS: " + fullSliceData[j].HomePlanets + " - SPEC in HS: " + fullSliceData[j].HomeSpecialties + " - Wormholes in HS: " + fullSliceData[j].HomeWormholes + "<br>--- RES in slice: " + fullSliceData[j].SliceResources + " - INF in slice: " + fullSliceData[j].SliceInfluence + " - Planets in slice: " + fullSliceData[j].SlicePlanets + " - SPEC in slice: " + fullSliceData[j].SliceSpecialties + " - Wormholes in slice: " + fullSliceData[j].SliceWormholes + " - Anomalies in slice: " + fullSliceData[j].SliceAnomalies + "<br>--- RES in EQD: " + fullSliceData[j].EQResources + " - INF in EQD: " + fullSliceData[j].EQInfluence + " - Planets in EQD: " + fullSliceData[j].EQPlanets + " - SPEC in EQD: " + fullSliceData[j].EQSpecialties + " - Wormholes in EQD: " + fullSliceData[j].EQWormholes + " - Anomalies in EQD: " + fullSliceData[j].EQAnomalies + "<br>--- Slice Weight: " + fullSliceData[j].SliceWeight + " - EQ Weight: " + fullSliceData[j].EQWeight + " - HS Weight: " + fullSliceData[j].HSWeight + " - Total Weight: " + fullSliceData[j].TotalWeight + "<br>");
+		}*/
+	}			
+	
+	//KSL END	
+	
     render() {
         return (
             <div id="options" className={this.props.visible ? "" : "d-none"}>
@@ -1398,6 +1992,19 @@ class MapOptions extends React.Component {
                         <label htmlFor="seed">Specific Seed</label>
                         <input className="form-control" id="seed" name="updateSeed" type="text" placeholder="Enter a number to seed generation..." value={this.state.currentSeed} onChange={this.updateSeed} />
                     </div>
+					
+					<div className="form-group">
+                        <label htmlFor="geniters">Board Generation Iteration Number (limit at 50)<QuestionCircle className="icon" onClick={this.toggleGenIterHelp} /></label>
+						
+                        <input className="form-control" id="geniters" name="resetGenIters" type="text" placeholder="Iteration Number..." value={this.state.generationIterations} onChange={this.resetGenerationIterations} />
+						
+                    </div>
+					<div className="form-group">
+                        <label htmlFor="stopCriterion">Balance Convergence Limit (relative)<QuestionCircle className="icon" onClick={this.toggleStopCritHelp} /></label>
+						
+                        <input className="form-control" id="stopCriterion" name="stopCriterion" type="text" placeholder="Stopping Criterion" value={this.state.stopCriterion} onChange={this.resetStopCriterion} />
+						
+                    </div>
 
                     <div className="custom-control custom-checkbox mb-3 d-flex">
                         <input type="checkbox" className="custom-control-input" id="pickRaces" name="pickRaces" checked={this.state.pickRaces} onChange={this.handleInputChange} />
@@ -1429,6 +2036,7 @@ class MapOptions extends React.Component {
                         <label className="custom-control-label" htmlFor="reversePlacementOrder">Reverse Placement Order</label>
                         <QuestionCircle className="icon" onClick={this.toggleReversePlacementOrderHelp} />
                     </div>
+					
 
                     <SetPlayerNameModal visible={this.state.setPlayerNamesHelp} currentPlayerNames={this.props.currentPlayerNames}
                                         hideModal={this.toggleSetPlayerNamesHelp} handleNameChange={this.handleNameChange}
@@ -1456,6 +2064,8 @@ class MapOptions extends React.Component {
                          <br><b>Initial:</b> Only guarantees a good tile right in front of the home system (on the way to mecatol). Everything else is random.
                          <br><b>Home:</b> Prioritizes all of the adjacent tiles to the home system and everything else is random.
                          <br><b>Random:</b> Shuffles the priority levels completely. No favoritism to tiles near the home system.
+						 <br><b>Fairness*:</b> Ensures a better distribution over players slices by alternating placement between players more optimally.
+						 <br><b>OptimalBalance**:</b> Entirely different placement style, without predefined placement queue. Systems are placed from most valuable to least valuable, and assigned to the player with the least valuable slice.
                          </p>'
                     />
                     <HelpModal key={"help-pick"} visible={this.state.pickStyleHelp} hideModal={this.togglePickStyleHelp} title={"About Pick Style"}
@@ -1511,6 +2121,26 @@ class MapOptions extends React.Component {
                          <br>
                          <br>
                          This option makes it so that Muaat will always receive a supernova, Saar will always receive an asteroid field, Empyrean will always receive a nebulae and Vuil'Raith will always receive a gravity rift.
+                         </p>"
+                    />
+					<HelpModal key={"help-generation-iterations"} visible={this.state.setIterationsHelp} hideModal={this.toggleGenIterHelp} title={"About Generation Iterations"}
+                         content="<p>
+                         The board generation will iterate until the difference between the player slice with the maximum total weight and that with the minimum total weight is smaller than 25. When 50 iterations are reached, the loop ends.
+                         <br>
+                         <br>
+                         This field mentions the last iteration done. If value at limit (50), then the target maximum weight difference of 25 is not achieved. Manually reset the field to 0 and regenerate the board to try again.
+                         </p>"
+                    />
+					<HelpModal key={"help-stopping-criterion"} visible={this.state.setStopCritHelp} hideModal={this.toggleStopCritHelp} title={"About Balance Stopping Criterion"}
+                         content="<p>
+                         The board generation will iterate until the difference between the player slice with the maximum total weight and that with the minimum total weight divided by the minimum total weight slice is smaller than the Balance Convergence Limit set. When 50 iterations are reached without convergence, the loop ends.
+                         <br>
+                         <br>
+                         0.1 is a good value to achieve player balance with limited iterations.
+						<br>
+						set 999 if only a single iteration is desired. 
+						<br>
+						If the Placement Style OptimalBalance is used, can drop the limit to 0.05.
                          </p>"
                     />
             

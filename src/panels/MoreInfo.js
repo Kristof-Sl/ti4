@@ -1,6 +1,7 @@
 import React from "react";
 import adjacencyData from "../data/adjacencyData.json";
 import tileData from "../data/tileData.json";
+import boardData from "../data/boardData.json";
 
 import influence from './icons/influence.png';
 import planet from './icons/planet.png';
@@ -123,6 +124,49 @@ class MoreInfo extends React.Component {
             }
 
         }
+		
+		//let fullSliceData = this.getSliceData();
+		let fullSliceData = this.props.sliceData;
+		let playerSliceDataString = [];
+		
+		if (fullSliceData != null && fullSliceData != undefined && fullSliceData.length > 0) {
+			for (let j = 0; j < fullSliceData.length; j++){
+				
+				playerSliceDataString.push(
+					<tr>
+						<th scope="row">{fullSliceData[j].Player}</th>
+						<td>{fullSliceData[j].SliceWeight}</td>
+						<td>{fullSliceData[j].EQWeight}</td>
+						<td>{fullSliceData[j].HSWeight}</td>
+						<td>{fullSliceData[j].TotalWeight}</td>
+						<td>{fullSliceData[j].PlayerWeight}</td>
+						<td>{fullSliceData[j].HomeTile}</td>
+						<td>{fullSliceData[j].Slice.toString()}</td>
+						<td>{fullSliceData[j].Equidistant.toString()}</td>
+						<td>{fullSliceData[j].SliceTiles.toString()}</td>
+						<td>{fullSliceData[j].HomeResources}</td>
+						<td>{fullSliceData[j].HomeInfluence}</td>
+						<td>{fullSliceData[j].HomePlanets}</td>
+						<td>{fullSliceData[j].HomeSpecialties}</td>
+						<td>{fullSliceData[j].HomeWormholes}</td>
+						<td>{fullSliceData[j].SliceResources}</td>
+						<td>{fullSliceData[j].SliceInfluence}</td>
+						<td>{fullSliceData[j].SlicePlanets}</td>
+						<td>{fullSliceData[j].SliceSpecialties}</td>
+						<td>{fullSliceData[j].SliceWormholes}</td>
+						<td>{fullSliceData[j].SliceAnomalies}</td>
+						<td>{fullSliceData[j].EQResources}</td>
+						<td>{fullSliceData[j].EQInfluence}</td>
+						<td>{fullSliceData[j].EQPlanets}</td>
+						<td>{fullSliceData[j].EQSpecialties}</td>
+						<td>{fullSliceData[j].EQWormholes}</td>
+						<td>{fullSliceData[j].EQAnomalies}</td>
+					</tr>
+
+				);
+			}
+		}
+		
         return (
             <div id="moreInfoContainer" className={this.props.visible ? "" : "d-none"}>
                 <div className="title">
@@ -141,6 +185,42 @@ class MoreInfo extends React.Component {
                         </thead>
                         <tbody>
                             {moreInfoByPlayer}
+                        </tbody>
+                    </table>
+					<table className="table">
+                        <thead>
+                            <tr>
+                                <th scope="col"></th>
+								<th scope="col">{"Slice Weight"}</th>
+								<th scope="col">{"Equid Weight"}</th>
+								<th scope="col">{"HS Weight"}</th>
+								<th scope="col">{"Total Weight"}</th>
+								<th scope="col">{"Player Weight"}</th>
+								<th scope="col">{"HS Index"}</th>
+                                <th scope="col">{"Slice Indexes"}</th>
+                                <th scope="col">{"EquiDist Indexes"}</th>
+								<th scope="col">{"Slice Tiles"}</th>
+                                <th scope="col">{"HS RES"}</th>
+								<th scope="col">{"HS INF"}</th>
+								<th scope="col">{"HS Planets"}</th>
+								<th scope="col">{"HS Specialties"}</th>
+								<th scope="col">{"HS Wormholes"}</th>
+								<th scope="col">{"Slice RES"}</th>
+								<th scope="col">{"Slice INF"}</th>
+								<th scope="col">{"Slice Planets"}</th>
+								<th scope="col">{"Slice Specialties"}</th>
+								<th scope="col">{"Slice Wormholes"}</th>
+								<th scope="col">{"Slice Anomalies"}</th>
+								<th scope="col">{"EquiDist RES"}</th>
+								<th scope="col">{"EquiDist INF"}</th>
+								<th scope="col">{"EquiDist Planets"}</th>
+								<th scope="col">{"EquiDist Specialties"}</th>
+								<th scope="col">{"EquiDist Wormholes"}</th>
+								<th scope="col">{"EquiDist Anomalies"}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {playerSliceDataString}
                         </tbody>
                     </table>
                 </div>

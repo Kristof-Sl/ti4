@@ -9,6 +9,7 @@ class ShareMapModal extends React.Component {
         super(props);
 
         this.getTTSTileString = this.getTTSTileString.bind(this);
+		this.getSliceDataTable = this.getSliceDataTable.bind(this);
         this.copyTileStringToClipboard = this.copyTileStringToClipboard.bind(this);
         this.copyLinkToClipboard = this.copyLinkToClipboard.bind(this);
         this.removeTrailing = this.removeTrailing.bind(this);
@@ -36,7 +37,31 @@ class ShareMapModal extends React.Component {
 
         return tileString
     }
+	
+	getSliceDataTable() {
+	//let fullSliceData = this.getSliceData();
+	debugger;
+		let fullSliceData = this.props.sliceData;
+		let playerSliceDataString = [];
+		
+		if (fullSliceData != null && fullSliceData != undefined && fullSliceData.length > 0) {
+			for (let j = 0; j < fullSliceData.length; j++){
+				
+				playerSliceDataString.push(
+					<tr>
+						<th scope="row">{fullSliceData[j].Player}</th>
+						<td>{fullSliceData[j].SliceWeight}</td>
+						<td>{fullSliceData[j].EQWeight}</td>
+						<td>{fullSliceData[j].HSWeight}</td>
+						<td>{fullSliceData[j].PlayerWeight}</td>
+					</tr>
 
+				);
+			}
+		}
+		
+		return playerSliceDataString;
+	}
     /**
      * Copies the TTS tile string to the clipboard
      */
@@ -99,6 +124,8 @@ class ShareMapModal extends React.Component {
 
     render() {
         let tileString = this.getTTSTileString();
+		let playerSliceDataString = this.getSliceDataTable();
+		
         return (
             <Modal show={this.props.visible} onHide={this.props.hideModal}>
                 <Modal.Header closeButton>
@@ -124,6 +151,22 @@ class ShareMapModal extends React.Component {
                     <div className="input-group mb-3 justify-content-center">
                         <button id="downloadMapButton" className="btn btn-primary" type="button" onClick={this.downloadImage}>Download Map Image</button>
                     </div>
+					<div className="KSL-slicedata">
+					<table className="table">
+                        <thead>
+                            <tr>
+                                <th scope="col"></th>
+								<th scope="col">{"Slice Weight"}</th>
+								<th scope="col">{"Equid Weight"}</th>
+								<th scope="col">{"HS Weight"}</th>
+								<th scope="col">{"Player Weight"}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {playerSliceDataString}
+                        </tbody>
+                    </table>
+					</div>
                 </Modal.Body>
             </Modal>
         );

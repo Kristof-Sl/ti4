@@ -66,7 +66,7 @@ class MapControls extends React.Component {
                 </div>
 
                 <ShareMapModal visible={this.state.shareMapHelp} hideModal={this.toggleShareMapHelp}
-                               tiles={this.props.tiles} map={this.props.map}
+                               tiles={this.props.tiles} map={this.props.map} sliceData={this.props.sliceData}
                 />
 
                 <div id="toggleBackgroundButton" className={"btn-group-justified btn-group-sm"} onClick={this.props.toggleBackground}>

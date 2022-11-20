@@ -57,6 +57,7 @@ class MapOptions extends React.Component {
             shuffleBoards: false,
             reversePlacementOrder: false,
             ensureRacialAnomalies: true,
+			//hideRaceTiles: false,
             generated: false,
 
             pickRacesHelp: false,
@@ -69,6 +70,7 @@ class MapOptions extends React.Component {
             shufflePriorityHelp: false,
             reversePlacementOrderHelp: false,
             ensureRacialAnomaliesHelp: false,
+			hideRaceTilesHelp: false,
 			setIterationsHelp: false,
 			setStopCritHelp: false,
 
@@ -86,6 +88,7 @@ class MapOptions extends React.Component {
         this.handleNameChange = this.handleNameChange.bind(this);
         this.handleRacesChange = this.handleRacesChange.bind(this);
         this.updatePok = this.updatePok.bind(this);
+		this.updateHRT = this.updateHRT.bind(this);
         this.updatePlayerCount = this.updatePlayerCount.bind(this);
         this.updateBoardStyle = this.updateBoardStyle.bind(this);
         this.updateSeed = this.updateSeed.bind(this);
@@ -113,6 +116,7 @@ class MapOptions extends React.Component {
         this.toggleShufflePriorityHelp = this.toggleShufflePriorityHelp.bind(this);
         this.toggleReversePlacementOrderHelp = this.toggleReversePlacementOrderHelp.bind(this);
         this.toggleEnsureRacialAnomaliesHelp = this.toggleEnsureRacialAnomaliesHelp.bind(this);
+		this.toggleHideRaceTilesHelp = this.toggleHideRaceTilesHelp.bind(this);
         this.toggleGenIterHelp = this.toggleGenIterHelp.bind(this);
 		this.toggleStopCritHelp = this.toggleStopCritHelp.bind(this);
     }
@@ -183,6 +187,15 @@ class MapOptions extends React.Component {
                 this.props.toggleProphecyOfKings(event);
             });
         }
+    }
+	
+    updateHRT(event) {
+		this.setState({
+			
+		}, () => {
+			
+			this.props.toggleHideRaceTiles(event);
+		});
     }
 
     updatePlayerCount(event) {
@@ -499,7 +512,7 @@ class MapOptions extends React.Component {
 
         // Get an ordered list of board spaces that need to have non-home systems assigned to them
         let systemIndexes = this.getNewTilesToPlace()
-
+	
         // Get current races for placing races, and shuffle them around
         if (currentRaces === undefined) {
             currentRaces = [...this.props.currentRaces]
@@ -539,6 +552,7 @@ class MapOptions extends React.Component {
 				let EQSlice = [];
 				
 				let allPlayersComplete = true;
+				
 				
 				for (let j = 0; j < theSliceData.length; j++) {
 					playerSliceComplete[j] = true;
@@ -618,6 +632,11 @@ class MapOptions extends React.Component {
         // Check that anomalies and wormholes are not adjacent
         this.checkAdjacencies(newTiles, useProphecyOfKings)
 
+		//KSL TODO Make sure specific races have their specific tile
+		if(this.state.ensureRacialAnomalies) {
+			this.checkRaceSlices(newTiles, useProphecyOfKings)
+		}
+		
         // Update the generated flag then update the tiles
         return newTiles;
     }
@@ -836,8 +855,8 @@ class MapOptions extends React.Component {
                 } else if(race === 'The Empyrean') {
                     anomalies = useProphecyOfKings ? [...tileData.nebulae.concat(tileData.pokNebulae)] : [...tileData.nebulae];
                     match = true;
-                // If The Vuil'Raith Cabal are in the game, ensure we have a gravity rift
-                } else if(race === "The Vuil'Raith Cabal") {
+                // If The Vuil'raith Cabal are in the game, ensure we have a gravity rift
+                } else if(race === "The Vuil'raith Cabal") {
                     anomalies = useProphecyOfKings ? [...tileData.gravityRifts.concat(tileData.pokGravityRifts)] : [...tileData.gravityRifts];
                     match = true;
                 }
@@ -919,7 +938,7 @@ class MapOptions extends React.Component {
                 weights = {
                     "resource": 80,
                     "influence": 40,
-                    "planet_count": 10,
+                    "planet_count": 15,
                     "specialty": 50,
                     "anomaly": 10,
                     "wormhole": 10,
@@ -1212,6 +1231,164 @@ class MapOptions extends React.Component {
         }
     }
 
+	//@KSL Make sure the requested anomalies are in the concerned player slices
+	checkRaceSlices(newTiles, useProphecyOfKings) {
+	
+		//Calculate slice data
+		let theSliceData = this.getSliceData(newTiles);
+		let weights = theSliceData[0].UsedWeights;
+		const allTrueAnomalies = useProphecyOfKings ? [...tileData.anomaly.concat(tileData.pokAnomaly)] : [...tileData.anomaly];
+		const allAlphaWormholes = useProphecyOfKings ? [...tileData.alphaWormholes.concat(tileData.pokAlphaWormholes)] : [...tileData.alphaWormholes];
+        const allBetaWormholes = useProphecyOfKings ? [...tileData.betaWormholes.concat(tileData.pokBetaWormholes)] : [...tileData.betaWormholes];
+		let anomalyTestSet = allTrueAnomalies;
+						
+		let currentRaces2 = [];
+		let currentHomeTile = -1;
+		for (let k=0; k < theSliceData.length; k++){
+			currentHomeTile = newTiles[theSliceData[k].HomeTile];
+			currentRaces2[k] = raceData.homeSystemToRaceMap[currentHomeTile];
+		}
+		
+		if(this.state.ensureRacialAnomalies && this.state.pickRaces) {
+            for (let r=0; r < currentRaces2.length; r++){
+				let race = currentRaces2[r];
+				let anomalies = []
+                let match = false;
+                // If The Clan of Saar are in the game, ensure they have an asteroid field in their slice
+                if(race === 'The Clan of Saar') {
+                    anomalies = useProphecyOfKings ? [...tileData.asteroidFields.concat(tileData.pokAsteroidFields)] : [...tileData.asteroidFields];
+                    match = true;
+                // If The Embers of Muaat are in the game, ensure they have a supernova in their slice
+                } else if(race === 'The Embers of Muaat') {
+                    anomalies = useProphecyOfKings ? [...tileData.supernovas.concat(tileData.pokSupernovas)] : [...tileData.supernovas];
+                    match = true;
+                // If The Empyrean are in the game, ensure they have a nebulae in their slice
+                } else if(race === 'The Empyrean') {
+                    anomalies = useProphecyOfKings ? [...tileData.nebulae.concat(tileData.pokNebulae)] : [...tileData.nebulae];
+                    match = true;
+                // If The Vuil'raith Cabal are in the game, ensure they have a gravity rift in their slice
+                } else if(race === "The Vuil'raith Cabal") {
+                    anomalies = useProphecyOfKings ? [...tileData.gravityRifts.concat(tileData.pokGravityRifts)] : [...tileData.gravityRifts];
+                    match = true;
+				// If The Ghosts of Creuss are in the game, ensure they have a wormhole in their slice
+                } else if(race === "The Ghosts of Creuss") {
+					anomalies = allAlphaWormholes.concat(allBetaWormholes);
+					anomalyTestSet = anomalies;
+                    match = true;
+                }
+
+				if(match) {
+
+					let anomalyFound = false;
+					
+					//Check if the anomaly is already in the slice of the concerned race
+					
+					let thisSlice = theSliceData[r].Slice;
+					let playerSliceWeights = [];					
+					
+					for (let sliceTileIndex of thisSlice) {
+						if (anomalies.indexOf(newTiles[sliceTileIndex]) > -1) {
+							anomalyFound = true;
+						}	
+						//Calculate weights of all tiles in this players slice
+						playerSliceWeights.push(this.getWeight(newTiles[sliceTileIndex], weights, []));
+					}
+						
+					//if yes, do nothing
+					
+					//if no, select a matching anomaly tile from the board to swap with
+					if (!anomalyFound) {
+						//search the boardTiles for a matching anomaly (should be somewhere on the board as ensureRacialAnomalies is True)
+						
+						let allMatchingAnomalyIndexes = [];
+						for (let matchingAnomaly of anomalies ) {
+							if (newTiles.indexOf(matchingAnomaly) > -1) {
+								allMatchingAnomalyIndexes.push(newTiles.indexOf(matchingAnomaly));	
+							}
+						}
+						
+						//Check if at least one matching anomaly is found on the board. This should be the case as "ensureRacialAnomalies" is True.
+						//and swap this anomaly tile with a tile that is closest in weight in the slice of the concerned race
+
+						if (allMatchingAnomalyIndexes.length > 0) {
+							
+							//Simply select the first matching anomaly tile found
+							let anomalyIndexToSwap = allMatchingAnomalyIndexes[0];
+							
+							//Check if there is a matching anomaly adjacent to the slice of the concerned player. Selecting this one will reduce the probability of having issues with adjacent anomalies later on.
+							for (let l=0; l < thisSlice.length; l++){
+								let adjacentTiles = adjacencyData[thisSlice[l]];
+								for (let adjacentTile of adjacentTiles) {
+									if (allMatchingAnomalyIndexes.indexOf(adjacentTile) >= 0) {
+										anomalyIndexToSwap = adjacentTile;
+									}	
+								}
+							}
+							
+							let anomalyToSwapWeight = this.getWeight(newTiles[anomalyIndexToSwap], weights, []);
+							
+							let deltaweight = 9999;
+							let playerTileIndexToSwap = -1;
+							let deltaweightBackup = 9999;
+							let playerTileIndexToSwapBackup = -1; //This is the backup swap tile, if there is no anomaly found in the player slice
+							let deltaweightBackup2 = 9999;
+							let playerTileIndexToSwapBackup2 = -1; //This is the second backup swap tile, if there is no anomaly found in the player slice
+							
+							for (let l=0; l < thisSlice.length; l++){
+								if (deltaweight > Math.abs(anomalyToSwapWeight - playerSliceWeights[l])) {
+									//only retain tiles in the player slice that are anomalies
+									if (anomalyTestSet.indexOf(newTiles[thisSlice[l]]) >= 0) {
+										deltaweight = Math.abs(anomalyToSwapWeight - playerSliceWeights[l]);
+										playerTileIndexToSwap = l;
+									}
+								}
+								if (deltaweightBackup > Math.abs(anomalyToSwapWeight - playerSliceWeights[l])) {								
+									//or tiles that do not have adjacent anomalies
+									let adjacentTiles = adjacencyData[thisSlice[l]];
+									let swappable = true;
+									for (let adjacentTile of adjacentTiles) {
+										if (anomalyTestSet.indexOf(newTiles[adjacentTile]) >= 0) {
+											// This tile has an adjacent anomaly, so throw it out
+											swappable = false;
+											break;
+										}
+									}
+									if (swappable) {
+										deltaweightBackup = Math.abs(anomalyToSwapWeight - playerSliceWeights[l]);
+										playerTileIndexToSwapBackup = l;
+									}	
+								}		
+								if (deltaweightBackup2 > Math.abs(anomalyToSwapWeight - playerSliceWeights[l])) {		
+										deltaweightBackup2 = Math.abs(anomalyToSwapWeight - playerSliceWeights[l]);
+										playerTileIndexToSwapBackup2 = l;
+								}
+							}
+							
+							//if there was no anomaly found in the player slice, take the backup swap file
+							if (playerTileIndexToSwap == -1) {
+								playerTileIndexToSwap = playerTileIndexToSwapBackup;
+								deltaweight = deltaweightBackup;
+							}
+							if (playerTileIndexToSwap == -1) {
+								playerTileIndexToSwap = playerTileIndexToSwapBackup2;
+								deltaweight = deltaweightBackup2;
+							}
+							
+							
+							//Check if the tiles that are going to be swapped do not cause two anomalies to be adjacant (TODO)
+							
+							//Swap tiles
+							let anomalyToSwap = newTiles[anomalyIndexToSwap];
+							newTiles[anomalyIndexToSwap] = newTiles[thisSlice[playerTileIndexToSwap]];
+							newTiles[thisSlice[playerTileIndexToSwap]] = anomalyToSwap;
+						
+						}
+					}
+                }				
+			}
+        }
+	}
+	
     ensureWormholesForType(possibleTiles, planetWormholes, allWormholes, oppositeWormholes, useProphecyOfKings, ensuredAnomalies) {
         let allAnomalyList = useProphecyOfKings ? [...tileData.red.concat(tileData.pokRed)] : [...tileData.red];
         let unusedWormholes = [];
@@ -1469,6 +1646,11 @@ class MapOptions extends React.Component {
             ensureRacialAnomaliesHelp: !this.state.ensureRacialAnomaliesHelp
         })
     }
+	toggleHideRaceTilesHelp(event) {
+        this.setState({
+            hideRaceTilesHelp: !this.state.hideRaceTilesHelp
+        })
+    }
 	toggleGenIterHelp(event) {
         this.setState({
             setIterationsHelp: !this.state.setIterationsHelp
@@ -1497,14 +1679,26 @@ class MapOptions extends React.Component {
 		//let newTiles = this.props.tiles;
 		
 		if (newTiles != null && newTiles != undefined && newTiles.length > 0) {
-		
-			let systemIndexes = [];
+		debugger;
+		let systemIndexes = [];
+		if (true) {
+			//This should work for any type of map
+			systemIndexes = this.getNewTilesToPlace();
+			systemIndexes = systemIndexes.concat(homeTiles);
+			systemIndexes.push(0);
+		} else {
 			for (let i = 0; i < newTiles.length; i++) {
+				//Works for all regular boards, where all indexes below numTiles are on the board. However, for oddly shaped boards, it does not work
 				if (i < numTiles) { //newTiles[i] > -1) {
 					systemIndexes.push(i);
 				}
+				
+				//This does not work if the map is not completely generated yet
+				//if (newTiles[i] > -1) {
+				//	systemIndexes.push(i);
+				//}
 			}
-		
+		}
 			let weights = {};
 			switch (this.state.currentPickStyle) {
 				case "random":
@@ -2037,6 +2231,12 @@ class MapOptions extends React.Component {
                         <QuestionCircle className="icon" onClick={this.toggleReversePlacementOrderHelp} />
                     </div>
 					
+					<div className="custom-control custom-checkbox mb-3 d-flex">
+                        <input type="checkbox" className="custom-control-input" id="hideRaceTiles" name="hideRaceTiles" checked={this.props.hideRaceTiles} onChange={this.updateHRT} />
+                        <label className="custom-control-label" htmlFor="hideRaceTiles">Hide Racial tiles on map</label>
+                        <QuestionCircle className="icon" onClick={this.toggleHideRaceTilesHelp} />
+                    </div>
+					
 
                     <SetPlayerNameModal visible={this.state.setPlayerNamesHelp} currentPlayerNames={this.props.currentPlayerNames}
                                         hideModal={this.toggleSetPlayerNamesHelp} handleNameChange={this.handleNameChange}
@@ -2120,7 +2320,7 @@ class MapOptions extends React.Component {
                          Ensures that races get their beneficial anomalies
                          <br>
                          <br>
-                         This option makes it so that Muaat will always receive a supernova, Saar will always receive an asteroid field, Empyrean will always receive a nebulae and Vuil'Raith will always receive a gravity rift.
+                         This option makes it so that Muaat will always receive a supernova, Saar will always receive an asteroid field, Empyrean will always receive a nebulae and Vuil'raith will always receive a gravity rift.
                          </p>"
                     />
 					<HelpModal key={"help-generation-iterations"} visible={this.state.setIterationsHelp} hideModal={this.toggleGenIterHelp} title={"About Generation Iterations"}
@@ -2141,6 +2341,12 @@ class MapOptions extends React.Component {
 						set 999 if only a single iteration is desired. 
 						<br>
 						If the Placement Style OptimalBalance is used, can drop the limit to 0.05.
+                         </p>"
+                    />
+					<HelpModal key={"help-hideRaceTiles"} visible={this.state.hideRaceTilesHelp} hideModal={this.toggleHideRaceTilesHelp} title={"About Hiding Race Tiles"}
+                         content="<p>
+                         Hide the racial home tiles on the map.
+                         
                          </p>"
                     />
             

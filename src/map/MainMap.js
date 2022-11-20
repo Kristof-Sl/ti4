@@ -1,6 +1,7 @@
 import React from "react";
 import './MainMap.css';
 import boardData from "../data/boardData.json";
+import raceData from "../data/raceData.json";
 import {Arrow90degLeft, Arrow90degRight, ArrowRepeat, Check, Lock, X} from "react-bootstrap-icons";
 import ReactTooltip from "react-tooltip";
 import $ from "jquery";
@@ -142,6 +143,15 @@ class MainMap extends React.Component {
         // Loop over 0 to pok board size, and add in the tile objects to be displayed
         for (let tileNumber = 0; tileNumber < boardData.pokSize; tileNumber++) {
             let systemNumber = this.props.getTileNumber(this.props.tiles[tileNumber])
+
+			//KSL hide race home tiles on the map if this parameter is checked
+			if (this.props.hideRaceTiles) {
+				let homeworlds = raceData["homeSystems"];
+				homeworlds = homeworlds.concat(raceData["pokHomeSystems"]);
+				if (homeworlds.indexOf(systemNumber) > -1) {
+							systemNumber = 0;
+				}
+			}
 
             // Add the tile to the array of tiles to be displayed, if they are valid tiles
             if (systemNumber !== undefined) {

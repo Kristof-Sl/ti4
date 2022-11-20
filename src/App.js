@@ -35,6 +35,7 @@ class App extends React.Component {
             tiles: [],
             unusedTiles: [],
 			sliceData: {},
+			hideRaceTiles: false,
             overlayVisible: false,
             zoom: 1.0,
             lastCall: 0,
@@ -74,6 +75,7 @@ class App extends React.Component {
 
         this.toggleOptionsMenu = this.toggleOptionsMenu.bind(this);
         this.toggleProphecyOfKings = this.toggleProphecyOfKings.bind(this);
+		this.toggleHideRaceTiles = this.toggleHideRaceTiles.bind(this);
         this.toggleOverlay = this.toggleOverlay.bind(this);
         this.updateTileNumberOverlays = this.updateTileNumberOverlays.bind(this);
         this.toggleMoreInfo = this.toggleMoreInfo.bind(this);
@@ -396,6 +398,12 @@ class App extends React.Component {
         this.setState({
             useProphecyOfKings: !this.state.useProphecyOfKings,
         }, this.showExtraTiles);
+    }
+	
+	toggleHideRaceTiles() {
+        this.setState({
+            hideRaceTiles: !this.state.hideRaceTiles,
+        }, this.drawMap);
     }
 
     /**
@@ -893,7 +901,7 @@ class App extends React.Component {
                     />
                     
                     <MainMap visible={this.state.mapVisible} overlayVisible={this.state.overlayVisible}
-                             tiles={this.state.tiles} useProphecyOfKings={this.state.useProphecyOfKings}
+                             tiles={this.state.tiles} useProphecyOfKings={this.state.useProphecyOfKings} hideRaceTiles={this.state.hideRaceTiles}
 
                              ref={this.map}
 
@@ -914,7 +922,7 @@ class App extends React.Component {
 
                 <MapControls visible={this.state.mapControlsVisible} extraTilesVisible={this.state.extraTilesVisible}
                              moreInfoVisible={this.state.moreInfoVisible} overlayVisible={this.state.overlayVisible}
-                             tiles={this.state.tiles} map={this.map}
+                             tiles={this.state.tiles} map={this.map} sliceData={this.state.sliceData}
 
                              toggleOverlay={this.toggleOverlay}
                              toggleMoreInfo={this.toggleMoreInfo} toggleExtraTiles={this.toggleExtraTiles}
@@ -937,14 +945,14 @@ class App extends React.Component {
 							getTileNumber={this.getTileNumber}
                 />
                 
-                <MapOptions visible={this.state.isOptionsMenuShowing} useProphecyOfKings={this.state.useProphecyOfKings}
+                <MapOptions visible={this.state.isOptionsMenuShowing} useProphecyOfKings={this.state.useProphecyOfKings} hideRaceTiles={this.state.hideRaceTiles}
                             currentPlayerNames={this.state.currentPlayerNames} currentRaces={this.state.currentRaces}
                             tiles={this.state.tiles} sliceData={this.state.sliceData} includedTiles={this.state.includedTiles}
                             excludedTiles={this.state.excludedTiles} lockedTiles={this.state.lockedTiles}
 
                             ref={this.mapOptions}
 
-                            toggleProphecyOfKings={this.toggleProphecyOfKings} updateTiles={this.updateTiles}
+                            toggleProphecyOfKings={this.toggleProphecyOfKings} updateTiles={this.updateTiles} toggleHideRaceTiles={this.toggleHideRaceTiles}
                             showExtraTiles={this.showExtraTiles} updateRaces={this.updateRaces}
                             updatePlayerNames={this.updatePlayerNames}
                 />

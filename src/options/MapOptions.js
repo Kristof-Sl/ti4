@@ -1267,9 +1267,9 @@ class MapOptions extends React.Component {
                     anomalies = useProphecyOfKings ? [...tileData.nebulae.concat(tileData.pokNebulae)] : [...tileData.nebulae];
                     match = true;
                 // If The Vuil'raith Cabal are in the game, ensure they have a gravity rift in their slice
-                } else if(race === "The Vuil'raith Cabal") {
-                    anomalies = useProphecyOfKings ? [...tileData.gravityRifts.concat(tileData.pokGravityRifts)] : [...tileData.gravityRifts];
-                    match = true;
+//                } else if(race === "The Vuil'raith Cabal") {
+//                    anomalies = useProphecyOfKings ? [...tileData.gravityRifts.concat(tileData.pokGravityRifts)] : [...tileData.gravityRifts];
+//                    match = true;
 				// If The Ghosts of Creuss are in the game, ensure they have a wormhole in their slice
                 } else if(race === "The Ghosts of Creuss") {
 					anomalies = allAlphaWormholes.concat(allBetaWormholes);

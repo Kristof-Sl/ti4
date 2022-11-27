@@ -491,7 +491,7 @@ class MapOptions extends React.Component {
 			}
 			let maxDeltaWeight = (Math.max(...sliceTotalWeights) - Math.min(...sliceTotalWeights))/Math.max(...sliceTotalWeights);
 			this.props.updateTiles(newTileSetGenerated, this.encodeSettings(), true, newSliceDataGenerated);
-			//debugger;
+			
 			if (!this.state.userSetSeed && maxDeltaWeight>this.state.stopCriterion && this.state.generationIterations < 50) {
 				this.generateBoard(event);
 				//console.log("iteration number: " + this.state.generationIterations);
@@ -1557,7 +1557,7 @@ class MapOptions extends React.Component {
         currentSetToShuffle = this.shuffle(currentSetToShuffle)
         postPossiblePlanets = postPossiblePlanets.concat(currentSetToShuffle)
 
-//debugger;
+
         // Convert from tuple down to just the tile number
         let orderedPlanets = [];
         for (let weightedPlanet in postPossiblePlanets) {
@@ -1679,7 +1679,7 @@ class MapOptions extends React.Component {
 		//let newTiles = this.props.tiles;
 		
 		if (newTiles != null && newTiles != undefined && newTiles.length > 0) {
-		debugger;
+		
 		let systemIndexes = [];
 		if (true) {
 			//This should work for any type of map
@@ -1741,7 +1741,7 @@ class MapOptions extends React.Component {
 					weights = {
 						"resource": 80,
 						"influence": 40,
-						"planet_count": 10,
+						"planet_count": 15,
 						"specialty": 50,
 						"anomaly": 10,
 						"wormhole": 10,
@@ -1968,7 +1968,7 @@ class MapOptions extends React.Component {
 				let numPlanetsHS = 0;
 				let specialtiesHS = 0;
 				let wormholesHS = 0;
-				// debugger;
+
 				let thisHomeTile = allAdjData[j].HomeTile;
 				let thisSystem = newTiles[thisHomeTile];
 				if (thisSystem > 0){
@@ -1985,7 +1985,7 @@ class MapOptions extends React.Component {
 					} 
 					wormholesHS += tile['wormhole'] ? 1 : 0;
 				}
-			  //debugger;
+				
 				let sliceWeight = 0;
 				sliceWeight += (resources / 4) * weights['resource'];
 				sliceWeight += (influence / 4) * weights['influence'];
@@ -2011,7 +2011,7 @@ class MapOptions extends React.Component {
 				//HSWeight += anomaliesHS * weights['anomaly'] + 40;
 			  
 				let totalWeight = sliceWeight + 0.5*EQWeight;
-				//debugger;
+
 				let playerWeight = 0;
 				//alternative weight calculation
 									
